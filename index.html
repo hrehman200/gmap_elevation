@@ -1,0 +1,49 @@
+<html>
+<head>
+    <title>Bootstrap & Google maps Tutorial by Bootstrapious.com</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <!--<link href='https://fonts.googleapis.com/css?family=Montserrat:400,700' rel='stylesheet' type='text/css'>-->
+    <style>
+        #map {
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="row">
+        <div class="col-md-12">
+            <label>Enter miles to travel:</label>
+            <input type="text" class="input-sm" id="milesToTravel" value="50"/>
+            <button id="btnGo" class="btn btn-sm">Go</button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div id="map"></div>
+        </div>
+        <div class="col-md-4">
+            <div id="elevation_chart"></div>
+            <div id="divElevation">
+
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script src="https://www.google.com/jsapi"></script>
+<script src="js/jquery-1.12.0.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
+<script src="js/custom.js"></script>
+<script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=KEY&callback=initMap">
+</script>
+
+</body>
+</html>
