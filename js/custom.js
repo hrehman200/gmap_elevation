@@ -11,6 +11,8 @@ function initMap() {
         zoom: 20
     };
     var map = new google.maps.Map(document.getElementById('map'), mapOptions);
+
+    var clickedPositionMarker = null;
     var markers = [];
 
     var currentLocation = null;
@@ -23,10 +25,47 @@ function initMap() {
 
     // Add a listener for the click event. Display the elevation for the LatLng of
     // the click inside the infowindow.
-    /*map.addListener('click', function (event) {
-     displayLocationElevation(event.latLng, elevator, infowindow);
-     placeMarker(event.latLng);
-     });*/
+    map.addListener('click', function (event) {
+
+        if(clickedPositionMarker != null) {
+            clickedPositionMarker.setMap(null);
+        }
+
+        clickedPositionMarker = new google.maps.Marker({
+            position: event.latLng,
+            map: map,
+            draggable: true
+        });
+
+        currentLocation = event.latLng;
+        map.setCenter(currentLocation);
+        drawCircle();
+
+        var range = 1;
+        findCoordinates(event.latLng.lat(), event.latLng.lng(), range);
+    });
+
+    function findCoordinates(lat, long, range) {
+        var numberOfPoints = 8;
+        var degreesPerPoint = 45;
+        var dg = 90;
+
+        for (var i = 0; i < numberOfPoints; i++) {
+            var newLat = Math.sin(dg * Math.PI / 180) * range + lat;
+            var newLng = Math.cos(dg * Math.PI / 180) * range + long;
+
+            var lat_long = new google.maps.LatLng(newLat, newLng);
+            var marker = new google.maps.Marker({
+                position: lat_long,
+                map: map
+            });
+            markers.push(marker);
+
+            dg += degreesPerPoint;
+        }
+
+        calcRoute();
+    }
 
     function findLocation() {
         if (navigator.geolocation) {
@@ -54,58 +93,66 @@ function initMap() {
 
     function calcRoute() {
 
-        var start = new google.maps.LatLng(currentLocation.lat, currentLocation.lng);
-        var end = new google.maps.LatLng(markers[0].getPosition().lat(), markers[0].getPosition().lng());
+        var start = new google.maps.LatLng(currentLocation.lat(), currentLocation.lng());
 
-        var bounds = new google.maps.LatLngBounds();
-        bounds.extend(start);
-        bounds.extend(end);
-        //map.fitBounds(bounds);
-        var request = {
-            origin: start,
-            destination: end,
-            travelMode: google.maps.TravelMode.DRIVING,
-            provideRouteAlternatives: true
-        };
-        directionsService.route(request, function (response, status) {
-            // clear former polylines
-            for (var j in  polylines) {
-                polylines[j].setMap(null);
-            }
-            polylines = [];
+        // clear former polylines
+        for (var j in  polylines) {
+            polylines[j].setMap(null);
+        }
+        polylines = [];
 
-            if (status == google.maps.DirectionsStatus.OK) {
-                var bounds = new google.maps.LatLngBounds();
-                // draw the lines in reverse orde, so the first one is on top (z-index)
-                for (var i = response.routes.length - 1; i >= 0; i--) {
-                    // let's make the first suggestion highlighted;
-                    var line = drawPolyline(response.routes[i].overview_path, '#ffffff');
-                    polylines.push(line);
-                    routes.push(response.routes[i].overview_path);
+        for(var i in markers) {
 
-                    highlightRoute(0);
+            var end = new google.maps.LatLng(markers[i].getPosition().lat(), markers[i].getPosition().lng());
 
-                    //bounds = line.getBounds(bounds);
-                    google.maps.event.addListener(line, 'click', function () {
-                        // detect which route was clicked on
-                        var index = polylines.indexOf(this);
-                        highlightRoute(index);
-                    });
+            var bounds = new google.maps.LatLngBounds();
+            bounds.extend(start);
+            bounds.extend(end);
+            //map.fitBounds(bounds);
+            var request = {
+                origin: start,
+                destination: end,
+                travelMode: google.maps.TravelMode.DRIVING,
+                provideRouteAlternatives: true
+            };
+            directionsService.route(request, function (response, status) {
+                if (status == google.maps.DirectionsStatus.OK) {
+                    var bounds = new google.maps.LatLngBounds();
+                    // draw the lines in reverse orde, so the first one is on top (z-index)
+                    for (var k = response.routes.length - 1; k >= 0; k--) {
+                        // let's make the first suggestion highlighted;
+                        var line = drawPolyline(response.routes[k].overview_path, '#ffffff');
+                        polylines.push(line);
+                        routes.push(response.routes[k].overview_path);
+
+                        highlightRoute(0);
+
+                        //bounds = line.getBounds(bounds);
+                        google.maps.event.addListener(line, 'click', function () {
+                            // detect which route was clicked on
+                            var index = polylines.indexOf(this);
+                            highlightRoute(index);
+                        });
+                    }
+                    //map.fitBounds(bounds);
+                } else {
+                    alert("Directions Request from " + start.toUrlValue(6) + " to " + end.toUrlValue(6) + " failed: " + status);
                 }
-                //map.fitBounds(bounds);
-            } else {
-                alert("Directions Request from " + start.toUrlValue(6) + " to " + end.toUrlValue(6) + " failed: " + status);
-            }
-        });
+            });
+        }
     }
 
-    function placeMarker(location) {
-
+    function removeMarkers() {
         directionsRenderer.setDirections({routes: []});
         for (var i in markers) {
             markers[i].setMap(null);
         }
         markers.pop();
+    }
+
+    function placeMarker(location) {
+
+        removeMarkers();
 
         var marker = new google.maps.Marker({
             position: location,
@@ -183,9 +230,9 @@ function initMap() {
 
         map.fitBounds(circle.getBounds());
 
-        google.maps.event.addListener(circle, 'click', function (ev) {
+        /*google.maps.event.addListener(circle, 'click', function (ev) {
             placeMarker(ev.latLng);
-        });
+        });*/
         //circle.bindTo('center', currentLocation, 'position');
     }
 
@@ -251,6 +298,6 @@ function initMap() {
 
     $('#btnGo').click(function (e) {
         findLocation();
-    });
+    }).click();
 }
 
