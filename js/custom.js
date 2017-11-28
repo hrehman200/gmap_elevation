@@ -14,6 +14,7 @@ function initMap() {
 
     var clickedPositionMarker = null;
     var markers = [];
+    var highestPositionMarkers = [];
 
     var currentLocation = null;
     var circle = null;
@@ -27,9 +28,7 @@ function initMap() {
     // the click inside the infowindow.
     map.addListener('click', function (event) {
 
-        if(clickedPositionMarker != null) {
-            clickedPositionMarker.setMap(null);
-        }
+        removeMarkers();
 
         clickedPositionMarker = new google.maps.Marker({
             position: event.latLng,
@@ -81,9 +80,7 @@ function initMap() {
                     icon: 'http://i.stack.imgur.com/orZ4x.png'
                 });
                 marker.setMap(map);
-
                 map.setCenter(currentLocation);
-                drawCircle();
 
             }, function () {
                 alert('Failed in finding location');
@@ -100,8 +97,10 @@ function initMap() {
             polylines[j].setMap(null);
         }
         polylines = [];
+        elevationsData = [];
+        routes = [];
 
-        for(var i in markers) {
+        for (var i in markers) {
 
             var end = new google.maps.LatLng(markers[i].getPosition().lat(), markers[i].getPosition().lng());
 
@@ -115,6 +114,7 @@ function initMap() {
                 travelMode: google.maps.TravelMode.DRIVING,
                 provideRouteAlternatives: true
             };
+
             directionsService.route(request, function (response, status) {
                 if (status == google.maps.DirectionsStatus.OK) {
                     var bounds = new google.maps.LatLngBounds();
@@ -133,21 +133,51 @@ function initMap() {
                             var index = polylines.indexOf(this);
                             highlightRoute(index);
                         });
+
+                        getPathElevation(response.routes[k].overview_path);
                     }
                     //map.fitBounds(bounds);
                 } else {
-                    alert("Directions Request from " + start.toUrlValue(6) + " to " + end.toUrlValue(6) + " failed: " + status);
+                    console.log("Directions Request from " + start.toUrlValue(6) + " to " + end.toUrlValue(6) + " failed: " + status);
                 }
             });
         }
+
+        setTimeout(function () {
+            elevationsData.sort(function(a, b) {
+                return b.elevation - a.elevation;
+            });
+
+            console.log(elevationsData);
+
+            for(var i = 0; i<3; i++) {
+                var marker = new google.maps.Marker({
+                    position: elevationsData[i].location,
+                    map: map
+                });
+
+                highestPositionMarkers.push(marker);
+            }
+
+        }, 5000);
     }
 
     function removeMarkers() {
         directionsRenderer.setDirections({routes: []});
+
+        if (clickedPositionMarker != null) {
+            clickedPositionMarker.setMap(null);
+        }
+
+        for(var i in highestPositionMarkers) {
+            highestPositionMarkers[i].setMap(null);
+        }
+        highestPositionMarkers = [];
+
         for (var i in markers) {
             markers[i].setMap(null);
         }
-        markers.pop();
+        markers = [];
     }
 
     function placeMarker(location) {
@@ -163,20 +193,13 @@ function initMap() {
         calcRoute();
     }
 
-    function displayPathElevation(path, elevator, map) {
-        // Display a polyline of the elevation path.
-        /*new google.maps.Polyline({
-         path: path,
-         strokeColor: '#ff0000',
-         strokeOpacity: 0.4,
-         map: map
-         });*/
+    function getPathElevation(route) {
 
         // Create a PathElevationRequest object using this array.
         // Ask for 256 samples along that path.
         // Initiate the path request.
         elevator.getElevationAlongPath({
-            'path': path,
+            'path': route,
             'samples': 256
         }, plotElevation);
     }
@@ -184,6 +207,7 @@ function initMap() {
     function plotElevation(elevations, status) {
 
         var chartDiv = document.getElementById('elevation_chart');
+        console.log(status);
         if (status !== 'OK') {
             // Show the error code inside the chartDiv.
             chartDiv.innerHTML = 'Cannot show elevation: request failed because ' +
@@ -211,10 +235,7 @@ function initMap() {
             titleY: 'Elevation (m)'
         });
 
-        var elevationDetails = calculateAvgAndMax(elevations);
-        $('#divElevation').html('<div><b>Average Elevation: </b>' + elevationDetails.avg + ' meters <br/>' +
-            '<b>Maximum Elevation: </b>' + elevationDetails.max + ' meters' +
-            '</div>');
+        $.merge(elevationsData, elevations);
     }
 
     function drawCircle() {
@@ -231,8 +252,8 @@ function initMap() {
         map.fitBounds(circle.getBounds());
 
         /*google.maps.event.addListener(circle, 'click', function (ev) {
-            placeMarker(ev.latLng);
-        });*/
+         placeMarker(ev.latLng);
+         });*/
         //circle.bindTo('center', currentLocation, 'position');
     }
 
@@ -240,8 +261,6 @@ function initMap() {
         for (var j in  polylines) {
             var color = (j == index) ? '#0000ff' : '#999999';
             polylines[j].setOptions({strokeColor: color});
-
-            displayPathElevation(routes[index], elevator, map);
         }
     }
 
@@ -254,25 +273,6 @@ function initMap() {
         });
         line.setMap(map);
         return line;
-    }
-
-    /**
-     * @returns {number} Average elevation in meters
-     */
-    function calculateAvgAndMax(elevations) {
-        var sum = 0;
-        var max = 0;
-        $.each(elevations, function (i, v) {
-            if (!isNaN(v.elevation)) {
-                sum += Number(v.elevation);
-
-                if (v.elevation > max) {
-                    max = v.elevation;
-                }
-            }
-        });
-        var len = elevations.length;
-        return {avg: (sum / len).toFixed(2), max: max.toFixed(2)};
     }
 
     function displayLocationElevation(location, elevator, infowindow) {
