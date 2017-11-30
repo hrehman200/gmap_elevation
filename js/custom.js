@@ -13,7 +13,7 @@ function initMap() {
     var map = new google.maps.Map(document.getElementById('map'), mapOptions);
 
     var clickedPositionMarker = null;
-    var markers = [];
+    var targetMarkers = [];
     var highestPositionMarkers = [];
 
     var currentLocation = null;
@@ -21,6 +21,8 @@ function initMap() {
     var polylines = [];
     var routes = [];
     var elevationsData = [];
+
+    var elevationIntervalId = 0;
 
     directionsRenderer.setMap(map);
 
@@ -40,7 +42,7 @@ function initMap() {
         map.setCenter(currentLocation);
         drawCircle();
 
-        var range = 1;
+        var range = $('#milesToTravel').val() * 1609.344 / 100000;
         findCoordinates(event.latLng.lat(), event.latLng.lng(), range);
     });
 
@@ -54,11 +56,14 @@ function initMap() {
             var newLng = Math.cos(dg * Math.PI / 180) * range + long;
 
             var lat_long = new google.maps.LatLng(newLat, newLng);
-            var marker = new google.maps.Marker({
+
+            /*var marker = new google.maps.Marker({
                 position: lat_long,
                 map: map
             });
-            markers.push(marker);
+            targetMarkers.push(marker);*/
+
+            targetMarkers.push(lat_long);
 
             dg += degreesPerPoint;
         }
@@ -100,9 +105,9 @@ function initMap() {
         elevationsData = [];
         routes = [];
 
-        for (var i in markers) {
+        for (var i in targetMarkers) {
 
-            var end = new google.maps.LatLng(markers[i].getPosition().lat(), markers[i].getPosition().lng());
+            var end = new google.maps.LatLng(targetMarkers[i].lat(), targetMarkers[i].lng());
 
             var bounds = new google.maps.LatLngBounds();
             bounds.extend(start);
@@ -133,8 +138,6 @@ function initMap() {
                             var index = polylines.indexOf(this);
                             highlightRoute(index);
                         });
-
-                        getPathElevation(response.routes[k].overview_path);
                     }
                     //map.fitBounds(bounds);
                 } else {
@@ -144,22 +147,25 @@ function initMap() {
         }
 
         setTimeout(function () {
-            elevationsData.sort(function(a, b) {
-                return b.elevation - a.elevation;
+            elevationIntervalId = setInterval(getPathElevation, 1500);
+        }, 6000);
+    }
+
+    function showHighestElevationMarkers() {
+        elevationsData.sort(function(a, b) {
+            return b.elevation - a.elevation;
+        });
+
+        console.log(elevationsData);
+
+        for(var i = 0; i<3; i++) {
+            var marker = new google.maps.Marker({
+                position: elevationsData[i].location,
+                map: map
             });
 
-            console.log(elevationsData);
-
-            for(var i = 0; i<3; i++) {
-                var marker = new google.maps.Marker({
-                    position: elevationsData[i].location,
-                    map: map
-                });
-
-                highestPositionMarkers.push(marker);
-            }
-
-        }, 5000);
+            highestPositionMarkers.push(marker);
+        }
     }
 
     function removeMarkers() {
@@ -169,39 +175,37 @@ function initMap() {
             clickedPositionMarker.setMap(null);
         }
 
-        for(var i in highestPositionMarkers) {
+        for (var i in highestPositionMarkers) {
             highestPositionMarkers[i].setMap(null);
         }
         highestPositionMarkers = [];
 
-        for (var i in markers) {
-            markers[i].setMap(null);
-        }
-        markers = [];
+        /*for (var i in targetMarkers) {
+         targetMarkers[i].setMap(null);
+         }*/
+        targetMarkers = [];
     }
 
-    function placeMarker(location) {
+    var count = 0;
 
-        removeMarkers();
+    function getPathElevation() {
 
-        var marker = new google.maps.Marker({
-            position: location,
-            map: map,
-            draggable: true
-        });
-        markers.push(marker);
-        calcRoute();
-    }
-
-    function getPathElevation(route) {
+        var route = routes[count];
 
         // Create a PathElevationRequest object using this array.
         // Ask for 256 samples along that path.
         // Initiate the path request.
         elevator.getElevationAlongPath({
             'path': route,
-            'samples': 256
+            'samples': 128
         }, plotElevation);
+
+        count++;
+        if(count >= routes.length) {
+            count = 0;
+            clearInterval(elevationIntervalId);
+            showHighestElevationMarkers();
+        }
     }
 
     function plotElevation(elevations, status) {
