@@ -32,11 +32,11 @@ function initMap() {
 
         removeMarkers();
 
-        clickedPositionMarker = new google.maps.Marker({
+        /*clickedPositionMarker = new google.maps.Marker({
             position: event.latLng,
             map: map,
             draggable: true
-        });
+        });*/
 
         currentLocation = event.latLng;
         map.setCenter(currentLocation);
@@ -126,22 +126,24 @@ function initMap() {
                     // draw the lines in reverse orde, so the first one is on top (z-index)
                     for (var k = response.routes.length - 1; k >= 0; k--) {
                         // let's make the first suggestion highlighted;
-                        var line = drawPolyline(response.routes[k].overview_path, '#ffffff');
-                        polylines.push(line);
+                        /*var line = drawPolyline(response.routes[k].overview_path, '#ffffff');
+                        polylines.push(line);*/
                         routes.push(response.routes[k].overview_path);
 
-                        highlightRoute(0);
+                        //highlightRoute(0);
 
                         //bounds = line.getBounds(bounds);
-                        google.maps.event.addListener(line, 'click', function () {
+                        /*google.maps.event.addListener(line, 'click', function () {
                             // detect which route was clicked on
                             var index = polylines.indexOf(this);
                             highlightRoute(index);
-                        });
+                        });*/
+
+                        $('#elevation_chart').html($('#elevation_chart').html() + 'Route fetched <br>');
                     }
                     //map.fitBounds(bounds);
                 } else {
-                    console.log("Directions Request from " + start.toUrlValue(6) + " to " + end.toUrlValue(6) + " failed: " + status);
+                    $('#elevation_chart').html($('#elevation_chart').html() + "Failed in fetching route: " + status + '<br>');
                 }
             });
         }
@@ -151,12 +153,17 @@ function initMap() {
         }, 6000);
     }
 
+    var _elevationSorter = function(a, b) {
+        return b.elevation - a.elevation;
+    };
+
     function showHighestElevationMarkers() {
-        elevationsData.sort(function(a, b) {
-            return b.elevation - a.elevation;
+        // highest elevations are the first element, make an array of only highest elevation elements
+        elevationsData = elevationsData.map(function (v, i) {
+            return v[0];
         });
 
-        console.log(elevationsData);
+        elevationsData.sort(_elevationSorter);
 
         for(var i = 0; i<3; i++) {
             var marker = new google.maps.Marker({
@@ -165,7 +172,10 @@ function initMap() {
             });
 
             highestPositionMarkers.push(marker);
+            displayLocationElevation(marker, elevationsData[i]);
         }
+
+        $('#elevation_chart').html('Results fetched successfully.');
     }
 
     function removeMarkers() {
@@ -201,7 +211,7 @@ function initMap() {
         }, plotElevation);
 
         count++;
-        if(count >= routes.length) {
+        if(count > routes.length) {
             count = 0;
             clearInterval(elevationIntervalId);
             showHighestElevationMarkers();
@@ -210,36 +220,17 @@ function initMap() {
 
     function plotElevation(elevations, status) {
 
-        var chartDiv = document.getElementById('elevation_chart');
         console.log(status);
         if (status !== 'OK') {
             // Show the error code inside the chartDiv.
-            chartDiv.innerHTML = 'Cannot show elevation: request failed because ' +
-                status;
+            $('#elevation_chart').html($('#elevation_chart').html() + 'Cannot show elevation: request failed because ' + status + '<br>');
             return;
         }
-        // Create a new chart in the elevation_chart DIV.
-        var chart = new google.visualization.ColumnChart(chartDiv);
 
-        // Extract the data from which to populate the chart.
-        // Because the samples are equidistant, the 'Sample'
-        // column here does double duty as distance along the
-        // X axis.
-        var data = new google.visualization.DataTable();
-        data.addColumn('string', 'Sample');
-        data.addColumn('number', 'Elevation');
-        for (var i = 0; i < elevations.length; i++) {
-            data.addRow(['', elevations[i].elevation]);
-        }
+        $('#elevation_chart').html($('#elevation_chart').html() + 'Elevation fetched for route<br>');
 
-        // Draw the chart using the data within its DIV.
-        chart.draw(data, {
-            height: 150,
-            legend: 'none',
-            titleY: 'Elevation (m)'
-        });
-
-        $.merge(elevationsData, elevations);
+        elevations.sort(_elevationSorter);
+        elevationsData.push(elevations);
     }
 
     function drawCircle() {
@@ -279,29 +270,14 @@ function initMap() {
         return line;
     }
 
-    function displayLocationElevation(location, elevator, infowindow) {
-        // Initiate the location request
-        elevator.getElevationForLocations({
-            'locations': [location]
-        }, function (results, status) {
-            infowindow.setPosition(location);
-            if (status === 'OK') {
-                // Retrieve the first result
-                if (results[0]) {
-                    // Open the infowindow indicating the elevation at the clicked position.
-                    infowindow.setContent('The elevation at this point <br>is ' +
-                        results[0].elevation + ' meters.');
-                } else {
-                    infowindow.setContent('No results found');
-                }
-            } else {
-                infowindow.setContent('Elevation service failed due to: ' + status);
-            }
+    function displayLocationElevation(marker, elevation) {
+        var infowindow = new google.maps.InfoWindow({
+            content: 'Elevation: ' + elevation.elevation.toFixed(2) + ' meters'
         });
+
+        infowindow.open(map, marker);
     }
 
-    $('#btnGo').click(function (e) {
-        findLocation();
-    }).click();
+    findLocation();
 }
 
