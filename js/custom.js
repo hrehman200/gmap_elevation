@@ -7,8 +7,11 @@ function initMap() {
     var directionsRenderer = new google.maps.DirectionsRenderer();
     var directionsService = new google.maps.DirectionsService();
 
+    var currentLocation = new google.maps.LatLng(24.664217, 46.4090183);
+
     var mapOptions = {
-        zoom: 20
+        zoom: 10,
+        center: currentLocation
     };
     var map = new google.maps.Map(document.getElementById('map'), mapOptions);
 
@@ -16,7 +19,6 @@ function initMap() {
     var targetMarkers = [];
     var highestPositionMarkers = [];
 
-    var currentLocation = null;
     var circle = null;
     var polylines = [];
     var routes = [];
@@ -42,7 +44,7 @@ function initMap() {
         map.setCenter(currentLocation);
         drawCircle();
 
-        var range = $('#milesToTravel').val() * 1609.344 / 100000;
+        var range = $('#kmToTravel').val() * 1000 / 100000;
         findCoordinates(event.latLng.lat(), event.latLng.lng(), range);
     });
 
@@ -239,7 +241,7 @@ function initMap() {
         }
         circle = new google.maps.Circle({
             map: map,
-            radius: 1609.344 * $('#milesToTravel').val(),    // in meters
+            radius: 1000 * $('#kmToTravel').val(),    // in meters
             fillColor: '#ff56ab',
             center: currentLocation
         });
@@ -271,6 +273,7 @@ function initMap() {
     }
 
     function displayLocationElevation(marker, elevation) {
+        console.log('Elevation: ' + elevation.elevation.toFixed(2) + ' meters');
         var infowindow = new google.maps.InfoWindow({
             content: 'Elevation: ' + elevation.elevation.toFixed(2) + ' meters'
         });
@@ -278,6 +281,7 @@ function initMap() {
         infowindow.open(map, marker);
     }
 
-    findLocation();
+    //findLocation();
+    //map.setCenter(currentLocation);
 }
 
